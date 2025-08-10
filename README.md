@@ -154,30 +154,6 @@ npm run format
 npm run build
 ```
 
-## Performance Considerations
 
-- Only visible layers are rendered
-- Trade area data is fetched on-demand
-- Spatial indexes are used for efficient queries
-- Material UI components use optimized imports
-- Debounced input handling
 
-## Browser Support
 
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the linting and test suite
-6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
