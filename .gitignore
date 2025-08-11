@@ -1,0 +1,72 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build tools
+.cache/
+dist/
+temp/
+
+# Vercel
+.vercel
+
+# Data files (large JSON datasets - keep local only)
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!vercel.json
+!.eslintrc.json
+
+# Specifically exclude large data files
+my_place.json
+competitors.json
+home_zipcodes.json
+trade_areas.json
+zipcodes.json
+
+# Temporary scripts
+clear-tables.js
+inspect-*.js
+test-*.js
+verify-*.js
