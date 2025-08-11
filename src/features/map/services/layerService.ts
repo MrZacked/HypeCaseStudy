@@ -253,22 +253,24 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         const baseColor = layer.color || TRADE_AREA_COLORS[layerIndex % TRADE_AREA_COLORS.length];
         
         const polygonLayer = new PolygonLayer({
-          id: `trade-area-${layer.id}-level-${level}`,
+          id: `trade-area-${layer.placeId}-level-${levelNum}`,
           data: validPolygons,
           pickable: false,
           stroked: true,
           filled: true,
           wireframe: false,
-          lineWidthMinPixels: 2,
+          lineWidthMinPixels: 1,
           getPolygon: (d: any) => d.coordinates,
           getFillColor: [...baseColor, Math.floor(opacity * 255)],
-          getLineColor: baseColor,
-          getLineWidth: 2,
-          coordinateSystem: 0
+          getLineColor: [0, 0, 0, 255],
+          getLineWidth: 1,
+          opacity: 1,
+          visible: true
         });
         
 
         
+
         layers.push(polygonLayer);
       });
     });
@@ -336,6 +338,8 @@ export function createMapLayers(config: MapLayersConfig): any[] {
       );
     });
   }
+
+
 
 
 
