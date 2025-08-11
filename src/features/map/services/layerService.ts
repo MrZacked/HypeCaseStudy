@@ -1,7 +1,7 @@
 import { IconLayer, PolygonLayer } from '@deck.gl/layers';
 import type { Place, TradeArea, LayerConfig } from '../../../shared/types';
 
-// Calculate distance between two points in meters (Haversine formula)
+// Haversine formula for distance calculation
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371e3; // Earth's radius in meters
   const φ1 = lat1 * Math.PI/180;
@@ -17,52 +17,71 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-// Extract polygon coordinates safely
+// Robust polygon coordinate extraction
 function extractPolygonCoordinates(polygon: any): number[][] {
-  if (!polygon || !polygon.coordinates) {
+  if (!polygon || typeof polygon !== 'object') {
     return [];
   }
 
-  const coords = polygon.coordinates;
+  let coords = polygon.coordinates;
   
-  // Handle MultiPolygon - take first polygon
+  // Handle string polygons (parsed JSON)
+  if (typeof polygon === 'string') {
+    try {
+      const parsed = JSON.parse(polygon);
+      coords = parsed.coordinates;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  if (!coords || !Array.isArray(coords)) {
+    return [];
+  }
+  
+  // Handle MultiPolygon - take the first polygon
   if (polygon.type === 'MultiPolygon') {
-    if (Array.isArray(coords) && coords.length > 0 && Array.isArray(coords[0])) {
+    if (coords.length > 0 && Array.isArray(coords[0]) && coords[0].length > 0) {
       return coords[0][0] || [];
     }
   }
   
-  // Handle Polygon - take exterior ring
+  // Handle Polygon - take the exterior ring
   if (polygon.type === 'Polygon') {
-    if (Array.isArray(coords) && coords.length > 0) {
+    if (coords.length > 0 && Array.isArray(coords[0])) {
       return coords[0] || [];
     }
   }
   
-  // Fallback for direct coordinate arrays
-  if (Array.isArray(coords)) {
-    if (coords.length > 0 && Array.isArray(coords[0]) && coords[0].length >= 2) {
-      return coords;
-    }
-    if (coords.length > 0 && Array.isArray(coords[0])) {
+  // Handle direct coordinate arrays
+  if (Array.isArray(coords) && coords.length > 0) {
+    // If first element is an array of arrays, take the first one
+    if (Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
       return coords[0];
+    }
+    // If first element is an array of numbers, use directly
+    if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
+      return coords;
     }
   }
   
   return [];
 }
 
-// Validate polygon coordinates
+// Validate and clean polygon coordinates
 function validatePolygonCoordinates(coords: number[][]): number[][] {
   if (!Array.isArray(coords) || coords.length < 3) {
     return [];
   }
   
-  // Filter valid coordinates
+  // Filter valid coordinate pairs
   const validCoords = coords.filter(coord => 
-    Array.isArray(coord) && coord.length >= 2 && 
-    typeof coord[0] === 'number' && typeof coord[1] === 'number' &&
-    !isNaN(coord[0]) && !isNaN(coord[1]) &&
+    Array.isArray(coord) && 
+    coord.length >= 2 && 
+    typeof coord[0] === 'number' && 
+    typeof coord[1] === 'number' &&
+    !isNaN(coord[0]) && 
+    !isNaN(coord[1]) &&
     coord[0] >= -180 && coord[0] <= 180 &&
     coord[1] >= -90 && coord[1] <= 90
   );
@@ -81,10 +100,10 @@ function validatePolygonCoordinates(coords: number[][]): number[][] {
   return validCoords;
 }
 
-// Color constants
+// Color palettes for distinct visualization
 export const TRADE_AREA_COLORS: [number, number, number][] = [
-  [255, 99, 71],   // Red
-  [54, 162, 235],  // Blue
+  [255, 99, 71],   // Tomato
+  [54, 162, 235],  // Blue  
   [75, 192, 192],  // Teal
   [255, 206, 84],  // Yellow
   [153, 102, 255], // Purple
@@ -96,11 +115,11 @@ export const TRADE_AREA_COLORS: [number, number, number][] = [
 ];
 
 export const HOME_ZIPCODE_COLORS: [number, number, number][] = [
-  [255, 206, 84],   // 0-20% - Yellow
-  [255, 159, 64],   // 20-40% - Orange
-  [255, 99, 132],   // 40-60% - Pink
-  [153, 102, 255],  // 60-80% - Purple
-  [201, 203, 207],  // 80-100% - Grey
+  [255, 206, 84],   // High density - Yellow
+  [255, 159, 64],   // Medium-high - Orange  
+  [255, 99, 132],   // Medium - Pink
+  [153, 102, 255],  // Low-medium - Purple
+  [201, 203, 207],  // Low density - Grey
 ];
 
 interface MapLayersConfig {
@@ -118,7 +137,7 @@ interface MapLayersConfig {
 export function createMapLayers(config: MapLayersConfig): any[] {
   const layers: any[] = [];
   
-  // 1. PLACES LAYER - Always show My Place, conditionally show nearby places
+  // 1. PLACES LAYER - Following case study specification
   const placesToShow: Place[] = [];
   
   // Always show My Place
@@ -126,39 +145,41 @@ export function createMapLayers(config: MapLayersConfig): any[] {
     placesToShow.push(config.myPlace);
   }
   
-  // Show nearby places if enabled
+  // Show nearby places only when filter is enabled
   if (config.filters?.showNearbyPlaces && config.myPlace) {
-    const filteredPlaces = config.places.filter(place => {
+    const nearbyPlaces = config.places.filter(place => {
       if (place.ismyplace) return false;
       
       // Apply radius filter
-      const distance = calculateDistance(
-        config.myPlace!.latitude,
-        config.myPlace!.longitude,
-        place.latitude,
-        place.longitude
-      );
-      
-      if (distance > config.filters.radius) return false;
+      if (config.filters.radius) {
+        const distance = calculateDistance(
+          config.myPlace!.latitude,
+          config.myPlace!.longitude,
+          place.latitude,
+          place.longitude
+        );
+        if (distance > config.filters.radius) return false;
+      }
       
       // Apply category filter
       if (config.filters.categories?.length > 0) {
-        return config.filters.categories.includes(place.sub_category);
+        if (!config.filters.categories.includes(place.sub_category)) return false;
       }
       
       return true;
     });
     
-    placesToShow.push(...filteredPlaces);
+    placesToShow.push(...nearbyPlaces);
   }
   
-  // Create places layer
+  // Create places layer with proper icons
   if (placesToShow.length > 0) {
     layers.push(
       new IconLayer({
         id: 'places-layer',
         data: placesToShow,
         pickable: true,
+        sizeScale: 1,
         getIcon: (d: Place) => ({
           url: d.ismyplace 
             ? 'https://img.icons8.com/color/48/map-pin.png'
@@ -175,21 +196,22 @@ export function createMapLayers(config: MapLayersConfig): any[] {
     );
   }
 
-  // 2. TRADE AREA LAYERS - Only render if trade areas are enabled
+  // 2. TRADE AREA LAYERS - On-demand polygon rendering
   if (config.showTradeAreas !== false) {
     const tradeAreaLayers = config.activeLayers.filter(layer => 
       layer.type === 'trade-area' && layer.visible && layer.data
     );
 
     tradeAreaLayers.forEach((layer, layerIndex) => {
-      if (!layer.data || !Array.isArray(layer.data) || layer.data.length === 0) {
+      if (!layer.data || !Array.isArray(layer.data)) {
         return;
       }
 
-      // Group by trade area level
+      // Group by trade area level (30%, 50%, 70%)
       const tradeAreasByLevel = layer.data.reduce((acc: Record<number, TradeArea[]>, area: TradeArea) => {
-        if (!acc[area.trade_area]) acc[area.trade_area] = [];
-        acc[area.trade_area].push(area);
+        const level = area.trade_area || 30;
+        if (!acc[level]) acc[level] = [];
+        acc[level].push(area);
         return acc;
       }, {});
 
@@ -197,8 +219,11 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         const levelNum = parseInt(level);
         const typedAreas = areas as TradeArea[];
         
-        // Check if this level is selected
-        const isLevelSelected = config.tradeAreaLevels?.find(tal => tal.level === levelNum && tal.selected);
+        // Check if this level is selected in UI
+        const isLevelSelected = config.tradeAreaLevels?.find(
+          tal => tal.level === levelNum && tal.selected
+        );
+        
         if (!isLevelSelected) {
           return;
         }
@@ -209,7 +234,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
             const coords = extractPolygonCoordinates(area.polygon);
             const validCoords = validatePolygonCoordinates(coords);
             
-            if (validCoords.length >= 3) {
+            if (validCoords.length >= 4) { // Minimum for closed polygon
               return {
                 ...area,
                 coordinates: validCoords
@@ -220,20 +245,20 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           .filter(Boolean);
         
         if (validPolygons.length === 0) {
+          console.warn(`No valid polygons for trade area level ${levelNum}`);
           return;
         }
         
-        // Set opacity based on level (30% = largest/lowest opacity, 70% = smallest/highest opacity)
-        const opacity = levelNum === 30 ? 0.3 : levelNum === 50 ? 0.5 : 0.7;
+        // Set opacity based on specification: 30% largest/lowest, 70% smallest/highest
+        const opacity = levelNum === 30 ? 0.25 : levelNum === 50 ? 0.4 : 0.65;
         
-        // Get color for this layer
         const baseColor = layer.color || TRADE_AREA_COLORS[layerIndex % TRADE_AREA_COLORS.length];
         
         layers.push(
           new PolygonLayer({
             id: `trade-area-${layer.id}-level-${level}`,
             data: validPolygons,
-            pickable: true,
+            pickable: false,
             stroked: true,
             filled: true,
             wireframe: false,
@@ -242,25 +267,28 @@ export function createMapLayers(config: MapLayersConfig): any[] {
             getFillColor: [...baseColor, Math.floor(opacity * 255)],
             getLineColor: baseColor,
             getLineWidth: 2,
+            coordinateSystem: 0, // LNGLAT coordinate system
           })
         );
       });
     });
   }
 
-  // 3. HOME ZIPCODE LAYERS - Only render if home zipcodes are enabled
+  // 3. HOME ZIPCODE LAYERS - Percentile-based visualization
   if (config.showHomeZipcodes !== false) {
     const homeZipcodeLayers = config.activeLayers.filter(layer => 
       layer.type === 'home-zipcodes' && layer.visible && layer.data
     );
 
     homeZipcodeLayers.forEach((layer) => {
-      if (!layer.data || !Array.isArray(layer.data) || layer.data.length === 0) {
+      if (!layer.data || !Array.isArray(layer.data)) {
         return;
       }
 
-      // Process and validate zipcode polygons
-      const validZipcodes = layer.data
+      // Sort by percentage for percentile calculation
+      const sortedData = [...layer.data].sort((a, b) => b.percentage - a.percentage);
+      
+      const validZipcodes = sortedData
         .map((zipcode, index) => {
           if (!zipcode.polygon) {
             return null;
@@ -269,16 +297,16 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           const coords = extractPolygonCoordinates(zipcode.polygon);
           const validCoords = validatePolygonCoordinates(coords);
           
-          if (validCoords.length >= 3) {
-            // Calculate percentile group for color assignment (5 groups)
-            const percentileGroup = Math.floor((index / layer.data.length) * 5);
+          if (validCoords.length >= 4) {
+            // Calculate percentile group (5 groups as per specification)
+            const percentileGroup = Math.floor((index / sortedData.length) * 5);
             const colorIndex = Math.min(percentileGroup, 4);
             
             return {
               ...zipcode,
               coordinates: validCoords,
               fillColor: HOME_ZIPCODE_COLORS[colorIndex],
-              percentage: zipcode.percentage || 0
+              percentileGroup: colorIndex
             };
           }
           return null;
@@ -286,6 +314,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         .filter(Boolean);
 
       if (validZipcodes.length === 0) {
+        console.warn('No valid home zipcode polygons found');
         return;
       }
 
@@ -293,7 +322,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         new PolygonLayer({
           id: `home-zipcodes-${layer.id}`,
           data: validZipcodes,
-          pickable: true,
+          pickable: false,
           stroked: true,
           filled: true,
           wireframe: false,
@@ -302,6 +331,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           getFillColor: (d: any) => [...d.fillColor, 128], // Semi-transparent
           getLineColor: (d: any) => d.fillColor,
           getLineWidth: 1,
+          coordinateSystem: 0, // LNGLAT coordinate system
         })
       );
     });

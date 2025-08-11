@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Paper, Typography, Button, Box } from '@mui/material';
+import { Paper, Typography, Button, Box, Tooltip } from '@mui/material';
 import { Place } from '../../../shared/types';
 import { useMapStore } from '../../../store/useMapStore';
 import { apiService } from '../../../shared/services/apiService';
@@ -24,7 +24,6 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
     setHomeZipcodesLoading
   } = useMapStore();
 
-  // Handle click outside to close tooltip
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
@@ -38,7 +37,7 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
     };
   }, [onClose]);
 
-  // Check if layers exist for this place
+  // Find existing layers for this place
   const tradeAreaLayer = activeLayers.find(layer => 
     layer.type === 'trade-area' && layer.placeId === place.id
   );
@@ -47,132 +46,134 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
     layer => layer.type === 'home-zipcodes' && layer.placeId === place.id
   );
 
-  // Check if max trade areas reached
+  // Check trade area limits
   const tradeAreaLayers = activeLayers.filter(layer => layer.type === 'trade-area');
   const maxTradeAreasReached = tradeAreaLayers.length >= config.maxTradeAreas;
 
   const handleShowTradeArea = async () => {
     if (tradeAreaLayer) {
-      // Remove existing layer
       removeLayer(tradeAreaLayer.id);
-    } else {
-      // Don't add if max reached
-      if (maxTradeAreasReached) {
-        return;
-      }
+      return;
+    }
+
+    if (maxTradeAreasReached) {
+      return;
+    }
+    
+    try {
+      setTradeAreaLoading(true);
       
-      try {
-        setTradeAreaLoading(true);
+      const tradeAreaData = await apiService.getTradeAreaData(place.id);
+      
+      if (tradeAreaData && tradeAreaData.length > 0) {
+        // Generate unique color for this place based on hash
+        const placeHash = place.id.split('').reduce((a, b) => {
+          a = ((a << 5) - a) + b.charCodeAt(0);
+          return a & a;
+        }, 0);
+        const colorIndex = Math.abs(placeHash) % TRADE_AREA_COLORS.length;
         
-        // Fetch trade area data
-        const tradeAreaData = await apiService.getTradeAreaData(place.id);
+        const newLayer = {
+          id: `trade-area-${place.id}`,
+          type: 'trade-area' as const,
+          placeId: place.id,
+          visible: true,
+          color: TRADE_AREA_COLORS[colorIndex] as [number, number, number],
+          opacity: 0.6,
+          timestamp: Date.now(),
+          data: tradeAreaData
+        };
         
-        if (tradeAreaData && Array.isArray(tradeAreaData) && tradeAreaData.length > 0) {
-          // Validate data
-          const validTradeAreas = tradeAreaData.filter(ta => 
-            ta && 
-            ta.polygon && 
-            ta.polygon.coordinates && 
-            Array.isArray(ta.polygon.coordinates) &&
-            typeof ta.trade_area === 'number'
-          );
-          
-          if (validTradeAreas.length > 0) {
-            // Generate unique color for this place
-            const placeHashColor = place.id.split('').reduce((a, b) => {
-              a = ((a << 5) - a) + b.charCodeAt(0);
-              return a & a;
-            }, 0);
-            const colorIndex = Math.abs(placeHashColor) % TRADE_AREA_COLORS.length;
-            
-            const newLayer = {
-              id: `trade-area-${place.id}`,
-              type: 'trade-area' as const,
-              placeId: place.id,
-              visible: true,
-              color: TRADE_AREA_COLORS[colorIndex] as [number, number, number],
-              opacity: 0.6,
-              timestamp: Date.now(),
-              data: validTradeAreas
-            };
-            addLayer(newLayer);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch trade area data:', error);
-      } finally {
-        setTradeAreaLoading(false);
+        addLayer(newLayer);
+        console.log(`Added trade area layer for ${place.name} with ${tradeAreaData.length} polygons`);
+      } else {
+        console.log(`No valid trade area data found for ${place.name}`);
       }
+    } catch (error) {
+      console.error('Failed to fetch trade area data:', error);
+    } finally {
+      setTradeAreaLoading(false);
     }
   };
 
   const handleShowHomeZipcodes = async () => {
     if (homeZipcodesLayer) {
-      // Remove existing layer
       removeLayer(homeZipcodesLayer.id);
-    } else {
-      try {
-        setHomeZipcodesLoading(true);
-        
-        // Clear other home zipcode layers (only one at a time)
-        activeLayers
-          .filter(layer => layer.type === 'home-zipcodes')
-          .forEach(layer => removeLayer(layer.id));
+      return;
+    }
+    
+    try {
+      setHomeZipcodesLoading(true);
+      
+      // Clear other home zipcode layers (only one at a time per specification)
+      activeLayers
+        .filter(layer => layer.type === 'home-zipcodes')
+        .forEach(layer => removeLayer(layer.id));
 
-        // Fetch home zipcode data
-        const homeZipcodesData = await apiService.getHomeZipcodesData(place.id);
+      const homeZipcodesData = await apiService.getHomeZipcodesData(place.id);
+      
+      if (homeZipcodesData && homeZipcodesData.locations) {
+        const zipcodeIds = Object.keys(homeZipcodesData.locations);
         
-        if (homeZipcodesData && homeZipcodesData.locations) {
-          const zipcodeIds = Object.keys(homeZipcodesData.locations);
-          
-          if (zipcodeIds.length > 0) {
-            const zipcodesPolygons = await apiService.getZipcodesPolygons(zipcodeIds);
-            
-            if (zipcodesPolygons && zipcodesPolygons.length > 0) {
-              // Validate and combine data
-              const combinedData = zipcodesPolygons
-                .filter(zipcode => 
-                  zipcode && 
-                  zipcode.id && 
-                  zipcode.polygon && 
-                  zipcode.polygon.coordinates
-                )
-                .map(zipcode => ({
-                  ...zipcode,
-                  percentage: parseFloat(homeZipcodesData.locations[zipcode.id] || '0')
-                }))
-                .filter(zipcode => !isNaN(zipcode.percentage))
-                .sort((a, b) => b.percentage - a.percentage);
-
-              if (combinedData.length > 0) {
-                const newLayer = {
-                  id: `home-zipcodes-${place.id}`,
-                  type: 'home-zipcodes' as const,
-                  placeId: place.id,
-                  visible: true,
-                  color: [54, 162, 235] as [number, number, number],
-                  opacity: 0.6,
-                  timestamp: Date.now(),
-                  data: combinedData
-                };
-                addLayer(newLayer);
-              }
-            }
-          }
+        if (zipcodeIds.length === 0) {
+          console.log(`No zipcode IDs found for ${place.name}`);
+          return;
         }
-      } catch (error) {
-        console.error('Failed to fetch home zipcode data:', error);
-      } finally {
-        setHomeZipcodesLoading(false);
+        
+        console.log(`Fetching polygons for ${zipcodeIds.length} zipcodes`);
+        const zipcodesPolygons = await apiService.getZipcodesPolygons(zipcodeIds);
+        
+        if (zipcodesPolygons && zipcodesPolygons.length > 0) {
+          // Combine percentage data with polygon data
+          const combinedData = zipcodesPolygons
+            .map(zipcode => ({
+              ...zipcode,
+              percentage: parseFloat(homeZipcodesData.locations[zipcode.id] || '0')
+            }))
+            .filter(zipcode => !isNaN(zipcode.percentage) && zipcode.percentage > 0)
+            .sort((a, b) => b.percentage - a.percentage); // Sort by percentage descending
+
+          if (combinedData.length > 0) {
+            const newLayer = {
+              id: `home-zipcodes-${place.id}`,
+              type: 'home-zipcodes' as const,
+              placeId: place.id,
+              visible: true,
+              color: [54, 162, 235] as [number, number, number],
+              opacity: 0.6,
+              timestamp: Date.now(),
+              data: combinedData
+            };
+            
+            addLayer(newLayer);
+            console.log(`Added home zipcodes layer for ${place.name} with ${combinedData.length} polygons`);
+          } else {
+            console.log(`No valid combined data for ${place.name}`);
+          }
+        } else {
+          console.log(`No zipcode polygons found for ${place.name}`);
+        }
+      } else {
+        console.log(`No home zipcode data found for ${place.name}`);
       }
+    } catch (error) {
+      console.error('Failed to fetch home zipcode data:', error);
+    } finally {
+      setHomeZipcodesLoading(false);
     }
   };
 
-  // Button states
-  const isTradeAreaDisabled = maxTradeAreasReached && !tradeAreaLayer;
-  const isHomeZipcodesDisabled = false; // Always allow trying to fetch
+  // Determine button states based on actual data availability flags
+  const tradeAreaAvailable = place.istradeareaavailable;
+  const homeZipcodesAvailable = place.ishomezipcodesavailable;
+  
+  const isTradeAreaDisabled = !tradeAreaAvailable || (maxTradeAreasReached && !tradeAreaLayer);
+  const isHomeZipcodesDisabled = !homeZipcodesAvailable;
 
   const getTradeAreaTooltip = () => {
+    if (!tradeAreaAvailable) {
+      return 'Trade area data is not available for this place.';
+    }
     if (maxTradeAreasReached && !tradeAreaLayer) {
       return `Maximum ${config.maxTradeAreas} trade areas can be displayed at once.`;
     }
@@ -180,8 +181,15 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
   };
 
   const getHomeZipcodesTooltip = () => {
+    if (!homeZipcodesAvailable) {
+      return 'Home zipcode data is not available for this place.';
+    }
     return homeZipcodesLayer ? 'Click to hide home zipcodes' : 'Click to show home zipcodes';
   };
+
+  // Show buttons based on selected data type (per specification)
+  const showTradeAreaButton = selectedDataType === 'trade-area';
+  const showHomeZipcodesButton = selectedDataType === 'home-zipcodes';
 
   return (
     <Paper
@@ -217,34 +225,38 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
       </Typography>
 
       <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {/* Show Trade Area button only if Trade Area is selected */}
-        {selectedDataType === 'trade-area' && (
-          <Button
-            variant={tradeAreaLayer ? "outlined" : "contained"}
-            color={tradeAreaLayer ? "secondary" : "primary"}
-            size="small"
-            fullWidth
-            disabled={isTradeAreaDisabled}
-            onClick={handleShowTradeArea}
-            title={getTradeAreaTooltip()}
-          >
-            {tradeAreaLayer ? 'Hide Trade Area' : 'Show Trade Area'}
-          </Button>
+        {showTradeAreaButton && (
+          <Tooltip title={getTradeAreaTooltip()} placement="top">
+            <span>
+              <Button
+                variant={tradeAreaLayer ? "outlined" : "contained"}
+                color={tradeAreaLayer ? "secondary" : "primary"}
+                size="small"
+                fullWidth
+                disabled={isTradeAreaDisabled}
+                onClick={handleShowTradeArea}
+              >
+                {tradeAreaLayer ? 'Hide Trade Area' : 'Show Trade Area'}
+              </Button>
+            </span>
+          </Tooltip>
         )}
 
-        {/* Show Home Zipcodes button only if Home Zipcodes is selected */}
-        {selectedDataType === 'home-zipcodes' && (
-          <Button
-            variant={homeZipcodesLayer ? "outlined" : "contained"}
-            color={homeZipcodesLayer ? "secondary" : "primary"}
-            size="small"
-            fullWidth
-            disabled={isHomeZipcodesDisabled}
-            onClick={handleShowHomeZipcodes}
-            title={getHomeZipcodesTooltip()}
-          >
-            {homeZipcodesLayer ? 'Hide Home Zipcodes' : 'Show Home Zipcodes'}
-          </Button>
+        {showHomeZipcodesButton && (
+          <Tooltip title={getHomeZipcodesTooltip()} placement="top">
+            <span>
+              <Button
+                variant={homeZipcodesLayer ? "outlined" : "contained"}
+                color={homeZipcodesLayer ? "secondary" : "primary"}
+                size="small"
+                fullWidth
+                disabled={isHomeZipcodesDisabled}
+                onClick={handleShowHomeZipcodes}
+              >
+                {homeZipcodesLayer ? 'Hide Home Zipcodes' : 'Show Home Zipcodes'}
+              </Button>
+            </span>
+          </Tooltip>
         )}
       </Box>
     </Paper>

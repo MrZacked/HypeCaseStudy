@@ -4,10 +4,10 @@ import { apiService } from '../../../shared/services/apiService';
 import { useMapStore } from '../../../store/useMapStore';
 
 export const useTradeAreas = () => {
-  const [tradeAreasData, setTradeAreasData] = useState<Record<string, TradeArea[]>>({});
+  const [tradeAreasData, setTradeAreasData] = useState<Record<string, TradeArea[] | null>>({});
   const { setTradeAreaLoading } = useMapStore();
 
-  const fetchTradeAreaData = useCallback(async (placeId: string): Promise<TradeArea[]> => {
+  const fetchTradeAreaData = useCallback(async (placeId: string): Promise<TradeArea[] | null> => {
     // Return cached data if available
     if (tradeAreasData[placeId]) {
       return tradeAreasData[placeId];
