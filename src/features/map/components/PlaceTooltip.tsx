@@ -170,6 +170,8 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
   const isTradeAreaDisabled = !tradeAreaAvailable || (maxTradeAreasReached && !tradeAreaLayer);
   const isHomeZipcodesDisabled = !homeZipcodesAvailable;
 
+
+
   const getTradeAreaTooltip = () => {
     if (!tradeAreaAvailable) {
       return 'Trade area data is not available for this place.';

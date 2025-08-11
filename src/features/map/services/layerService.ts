@@ -202,12 +202,13 @@ export function createMapLayers(config: MapLayersConfig): any[] {
       layer.type === 'trade-area' && layer.visible && layer.data
     );
 
+
+
     tradeAreaLayers.forEach((layer, layerIndex) => {
       if (!layer.data || !Array.isArray(layer.data)) {
         return;
       }
 
-      // Group by trade area level (30%, 50%, 70%)
       const tradeAreasByLevel = layer.data.reduce((acc: Record<number, TradeArea[]>, area: TradeArea) => {
         const level = area.trade_area || 30;
         if (!acc[level]) acc[level] = [];
@@ -219,7 +220,6 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         const levelNum = parseInt(level);
         const typedAreas = areas as TradeArea[];
         
-        // Check if this level is selected in UI
         const isLevelSelected = config.tradeAreaLevels?.find(
           tal => tal.level === levelNum && tal.selected
         );
@@ -228,13 +228,12 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           return;
         }
         
-        // Process and validate polygons
         const validPolygons = typedAreas
           .map(area => {
             const coords = extractPolygonCoordinates(area.polygon);
             const validCoords = validatePolygonCoordinates(coords);
             
-            if (validCoords.length >= 4) { // Minimum for closed polygon
+            if (validCoords.length >= 4) {
               return {
                 ...area,
                 coordinates: validCoords
@@ -245,7 +244,6 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           .filter(Boolean);
         
         if (validPolygons.length === 0) {
-          console.warn(`No valid polygons for trade area level ${levelNum}`);
           return;
         }
         
@@ -254,22 +252,24 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         
         const baseColor = layer.color || TRADE_AREA_COLORS[layerIndex % TRADE_AREA_COLORS.length];
         
-        layers.push(
-          new PolygonLayer({
-            id: `trade-area-${layer.id}-level-${level}`,
-            data: validPolygons,
-            pickable: false,
-            stroked: true,
-            filled: true,
-            wireframe: false,
-            lineWidthMinPixels: 2,
-            getPolygon: (d: any) => d.coordinates,
-            getFillColor: [...baseColor, Math.floor(opacity * 255)],
-            getLineColor: baseColor,
-            getLineWidth: 2,
-            coordinateSystem: 0, // LNGLAT coordinate system
-          })
-        );
+        const polygonLayer = new PolygonLayer({
+          id: `trade-area-${layer.id}-level-${level}`,
+          data: validPolygons,
+          pickable: false,
+          stroked: true,
+          filled: true,
+          wireframe: false,
+          lineWidthMinPixels: 2,
+          getPolygon: (d: any) => d.coordinates,
+          getFillColor: [...baseColor, Math.floor(opacity * 255)],
+          getLineColor: baseColor,
+          getLineWidth: 2,
+          coordinateSystem: 0
+        });
+        
+
+        
+        layers.push(polygonLayer);
       });
     });
   }
@@ -331,11 +331,13 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           getFillColor: (d: any) => [...d.fillColor, 128], // Semi-transparent
           getLineColor: (d: any) => d.fillColor,
           getLineWidth: 1,
-          coordinateSystem: 0, // LNGLAT coordinate system
+          coordinateSystem: 0
         })
       );
     });
   }
+
+
 
   return layers;
 }
