@@ -137,66 +137,7 @@ interface MapLayersConfig {
 export function createMapLayers(config: MapLayersConfig): any[] {
   const layers: any[] = [];
   
-  // 1. PLACES LAYER - Following case study specification
-  const placesToShow: Place[] = [];
-  
-  // Always show My Place
-  if (config.myPlace) {
-    placesToShow.push(config.myPlace);
-  }
-  
-  // Show nearby places only when filter is enabled
-  if (config.filters?.showNearbyPlaces && config.myPlace) {
-    const nearbyPlaces = config.places.filter(place => {
-      if (place.ismyplace) return false;
-      
-      // Apply radius filter
-      if (config.filters.radius) {
-        const distance = calculateDistance(
-          config.myPlace!.latitude,
-          config.myPlace!.longitude,
-          place.latitude,
-          place.longitude
-        );
-        if (distance > config.filters.radius) return false;
-      }
-      
-      // Apply category filter
-      if (config.filters.categories?.length > 0) {
-        if (!config.filters.categories.includes(place.sub_category)) return false;
-      }
-      
-      return true;
-    });
-    
-    placesToShow.push(...nearbyPlaces);
-  }
-  
-  // Create places layer with proper icons
-  if (placesToShow.length > 0) {
-    layers.push(
-      new IconLayer({
-        id: 'places-layer',
-        data: placesToShow,
-        pickable: true,
-        sizeScale: 1,
-        getIcon: (d: Place) => ({
-          url: d.ismyplace 
-            ? 'https://img.icons8.com/color/48/map-pin.png'
-            : 'https://img.icons8.com/color/48/marker.png',
-          width: 48,
-          height: 48,
-          anchorY: 48,
-        }),
-        getPosition: (d: Place) => [d.longitude, d.latitude],
-        getSize: (d: Place) => d.ismyplace ? 60 : 40,
-        onHover: config.onHover,
-        onClick: config.onClick,
-      })
-    );
-  }
-
-  // 2. TRADE AREA LAYERS - On-demand polygon rendering
+  // 1. TRADE AREA LAYERS - Render first (under markers)
   if (config.showTradeAreas !== false) {
     const tradeAreaLayers = config.activeLayers.filter(layer => 
       layer.type === 'trade-area' && layer.visible && layer.data
@@ -339,9 +280,64 @@ export function createMapLayers(config: MapLayersConfig): any[] {
     });
   }
 
-
-
-
+  // 3. PLACES LAYER - Render last (on top of polygons)
+  const placesToShow: Place[] = [];
+  
+  // Always show My Place
+  if (config.myPlace) {
+    placesToShow.push(config.myPlace);
+  }
+  
+  // Show nearby places only when filter is enabled
+  if (config.filters?.showNearbyPlaces && config.myPlace) {
+    const nearbyPlaces = config.places.filter(place => {
+      if (place.ismyplace) return false;
+      
+      // Apply radius filter
+      if (config.filters.radius) {
+        const distance = calculateDistance(
+          config.myPlace!.latitude,
+          config.myPlace!.longitude,
+          place.latitude,
+          place.longitude
+        );
+        if (distance > config.filters.radius) return false;
+      }
+      
+      // Apply category filter
+      if (config.filters.categories?.length > 0) {
+        if (!config.filters.categories.includes(place.sub_category)) return false;
+      }
+      
+      return true;
+    });
+    
+    placesToShow.push(...nearbyPlaces);
+  }
+  
+  // Create places layer with proper icons (renders on top)
+  if (placesToShow.length > 0) {
+    layers.push(
+      new IconLayer({
+        id: 'places-layer',
+        data: placesToShow,
+        pickable: true,
+        sizeScale: 1,
+        getIcon: (d: Place) => ({
+          url: d.ismyplace 
+            ? 'https://img.icons8.com/color/48/map-pin.png'
+            : 'https://img.icons8.com/color/48/marker.png',
+          width: 48,
+          height: 48,
+          anchorY: 48,
+        }),
+        getPosition: (d: Place) => [d.longitude, d.latitude],
+        getSize: (d: Place) => d.ismyplace ? 60 : 40,
+        onHover: config.onHover,
+        onClick: config.onClick,
+      })
+    );
+  }
 
   return layers;
 }

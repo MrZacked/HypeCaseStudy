@@ -2,7 +2,6 @@ import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
 import { useMapStore } from '../../../store/useMapStore';
 import { TRADE_AREA_COLORS, HOME_ZIPCODE_COLORS } from '../../map/services/layerService';
-import { TRADE_AREA_LEVELS } from '../../../shared/config';
 
 interface LegendItemProps {
   color: [number, number, number];
@@ -153,36 +152,78 @@ const LegendContent: React.FC = () => {
             Trade Areas
           </Typography>
           
-          {TRADE_AREA_LEVELS.map((level, index) => {
-            const isSelected = tradeAreaLevels?.find(tal => tal.level === level && tal.selected);
-            
-            if (!isSelected) return null;
-            
-            // Get description based on level (largest to smallest area)
-            const getDescription = (level: number) => {
-              switch (level) {
-                case 30: return 'Largest area, lowest opacity';
-                case 50: return 'Medium area, medium opacity';
-                case 70: return 'Smallest area, highest opacity';
-                default: return '';
-              }
-            };
-            
-            return (
-              <LegendItem
-                key={level}
-                color={TRADE_AREA_COLORS[index % TRADE_AREA_COLORS.length]}
-                label={`${level}%`}
-                description={getDescription(level)}
-              />
+          {(() => {
+            const activeTradeAreaLayers = activeLayers.filter(layer => 
+              layer.type === 'trade-area' && layer.visible && layer.data
             );
-          })}
-          
-          {activeLayers.filter(layer => layer.type === 'trade-area' && layer.visible).length === 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              Click "Show Trade Area" on a place to display trade area polygons
-            </Typography>
-          )}
+            
+            if (activeTradeAreaLayers.length === 0) {
+              return (
+                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                  Click "Show Trade Area" on a place to display trade area polygons
+                </Typography>
+              );
+            }
+            
+            // Group layers by place
+            const layersByPlace = activeTradeAreaLayers.reduce((acc, layer, layerIndex) => {
+              const placeName = layer.placeName || `Place ${layer.placeId}`;
+              if (!acc[placeName]) {
+                acc[placeName] = [];
+              }
+              
+              // Get levels for this layer
+              const tradeAreasByLevel = layer.data.reduce((levelAcc: Record<number, any[]>, area: any) => {
+                const level = area.trade_area || 30;
+                if (!levelAcc[level]) levelAcc[level] = [];
+                levelAcc[level].push(area);
+                return levelAcc;
+              }, {});
+              
+              Object.keys(tradeAreasByLevel).forEach(level => {
+                const levelNum = parseInt(level);
+                const isLevelSelected = tradeAreaLevels?.find(
+                  tal => tal.level === levelNum && tal.selected
+                );
+                
+                if (isLevelSelected) {
+                  acc[placeName].push({
+                    level: levelNum,
+                    color: layer.color || TRADE_AREA_COLORS[layerIndex % TRADE_AREA_COLORS.length]
+                  });
+                }
+              });
+              
+              return acc;
+            }, {} as Record<string, Array<{level: number, color: [number, number, number]}>>);
+            
+            return Object.entries(layersByPlace).map(([placeName, levels]) => (
+              <Box key={placeName} sx={{ mb: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                  {placeName}
+                </Typography>
+                {levels.sort((a, b) => a.level - b.level).map(({ level, color }) => {
+                  const getDescription = (level: number) => {
+                    switch (level) {
+                      case 30: return 'Largest area, lowest opacity';
+                      case 50: return 'Medium area, medium opacity';
+                      case 70: return 'Smallest area, highest opacity';
+                      default: return '';
+                    }
+                  };
+                  
+                  return (
+                    <LegendItem
+                      key={`${placeName}-${level}`}
+                      color={color}
+                      label={`${level}%`}
+                      description={getDescription(level)}
+                    />
+                  );
+                })}
+              </Box>
+            ));
+          })()}
         </Box>
       )}
 

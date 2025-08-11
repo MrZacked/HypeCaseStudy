@@ -77,6 +77,7 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
           id: `trade-area-${place.id}`,
           type: 'trade-area' as const,
           placeId: place.id,
+          placeName: place.name,
           visible: true,
           color: TRADE_AREA_COLORS[colorIndex] as [number, number, number],
           opacity: 0.6,
@@ -91,6 +92,10 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
       }
     } catch (error) {
       console.error('Failed to fetch trade area data:', error);
+      // If data is flagged as available but fails to load, this indicates a data integrity issue
+      if (place.istradeareaavailable) {
+        console.warn(`Trade area data was flagged as available for ${place.name} but failed to load. Consider updating data flags.`);
+      }
     } finally {
       setTradeAreaLoading(false);
     }
@@ -138,6 +143,7 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
               id: `home-zipcodes-${place.id}`,
               type: 'home-zipcodes' as const,
               placeId: place.id,
+              placeName: place.name,
               visible: true,
               color: [54, 162, 235] as [number, number, number],
               opacity: 0.6,
@@ -158,6 +164,10 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
       }
     } catch (error) {
       console.error('Failed to fetch home zipcode data:', error);
+      // If data is flagged as available but fails to load, this indicates a data integrity issue
+      if (place.ishomezipcodesavailable) {
+        console.warn(`Home zipcode data was flagged as available for ${place.name} but failed to load. Consider updating data flags.`);
+      }
     } finally {
       setHomeZipcodesLoading(false);
     }

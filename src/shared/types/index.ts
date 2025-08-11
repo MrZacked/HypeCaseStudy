@@ -56,6 +56,7 @@ export interface LayerConfig {
   id: string;
   type: 'places' | 'trade-area' | 'home-zipcodes';
   placeId?: string;
+  placeName?: string;
   visible: boolean;
   color?: [number, number, number];
   opacity?: number;
