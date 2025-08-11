@@ -8,8 +8,8 @@ export interface Place {
   longitude: number;
   latitude: number;
   sub_category: string;
-  istradeareaavailable: boolean;
-  ishomezipcodesavailable: boolean;
+  isTradeAreaAvailable: boolean;
+  isHomeZipcodesAvailable: boolean;
   ismyplace?: boolean;
 }
 
@@ -24,7 +24,7 @@ export interface Zipcode {
 }
 
 export interface Location {
-  [zipcodeId: string]: string; // Percentages are stored as strings in the database
+  [id: string]: number;
 }
 
 export interface TradeArea {
@@ -35,7 +35,7 @@ export interface TradeArea {
 
 export interface HomeZipcodes {
   place_id: string;
-  locations: Location;
+  locations: Location[];
 }
 
 export interface PlaceFilters {

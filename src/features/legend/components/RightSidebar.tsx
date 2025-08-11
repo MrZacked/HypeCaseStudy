@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { memo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useMapStore } from '../../../store/useMapStore';
 import LegendContent from './LegendContent';
+import ExportData from '../../../shared/components/ExportData';
 
 const RightSidebar: React.FC = () => {
   const { toggleRightSidebar } = useMapStore();
@@ -24,9 +25,10 @@ const RightSidebar: React.FC = () => {
         <IconButton onClick={toggleRightSidebar} size="small">
           <ChevronRightIcon />
         </IconButton>
-        <Typography variant="h6" component="h1">
+        <Typography variant="h6" component="h1" sx={{ flex: 1, textAlign: 'center' }}>
           Legend
         </Typography>
+        <ExportData />
       </Box>
 
       {/* Content */}
@@ -37,4 +39,4 @@ const RightSidebar: React.FC = () => {
   );
 };
 
-export default RightSidebar;
+export default memo(RightSidebar);

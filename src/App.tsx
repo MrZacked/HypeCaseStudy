@@ -1,11 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Dialog, DialogTitle, DialogContent, Box } from '@mui/material';
 import AppLayout from './shared/components/layout/AppLayout';
 import LeftSidebar from './features/controls/components/LeftSidebar';
 import RightSidebar from './features/legend/components/RightSidebar';
 import MapContainer from './features/map/components/MapContainer';
 import ErrorBoundary from './shared/components/common/ErrorBoundary';
+import KeyboardShortcuts from './shared/components/KeyboardShortcuts';
+import PlaceSearch from './shared/components/PlaceSearch';
 import { useMapStore } from './store/useMapStore';
 import { apiService } from './shared/services/apiService';
 
@@ -39,6 +42,7 @@ const theme = createTheme({
 
 const App: React.FC = () => {
   const { setPlaces, setMyPlace, setPlacesLoading, setViewState } = useMapStore();
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -73,6 +77,32 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        
+        {/* Global Keyboard Shortcuts */}
+        <KeyboardShortcuts 
+          onToggleSearch={() => setSearchDialogOpen(true)}
+        />
+        
+        {/* Global Search Dialog */}
+        <Dialog 
+          open={searchDialogOpen} 
+          onClose={() => setSearchDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Search Places</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 1 }}>
+              <PlaceSearch 
+                placeholder="Search by name, address, or category..."
+                size="medium"
+                showCategories={true}
+                onPlaceSelect={() => setSearchDialogOpen(false)}
+              />
+            </Box>
+          </DialogContent>
+        </Dialog>
+        
         <AppLayout
           leftSidebar={<LeftSidebar />}
           rightSidebar={<RightSidebar />}

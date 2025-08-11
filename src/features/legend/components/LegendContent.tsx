@@ -59,23 +59,36 @@ const LegendContent: React.FC = () => {
 
     if (homeZipcodeLayer && homeZipcodeLayer.data && Array.isArray(homeZipcodeLayer.data)) {
       const data = homeZipcodeLayer.data;
-      const percentages = data.map(d => d.percentage).sort((a, b) => b - a);
+      // Filter out undefined/null percentages and ensure they're numbers
+      const validPercentages = data
+        .map(d => d.percentage)
+        .filter(p => p !== undefined && p !== null && !isNaN(Number(p)))
+        .map(p => Number(p))
+        .sort((a, b) => b - a);
       
-      if (percentages.length > 0) {
+      if (validPercentages.length > 0) {
         const ranges: Array<{label: string; description: string}> = [];
         
         // Create 5 percentile groups
         for (let i = 0; i < 5; i++) {
-          const startIndex = Math.floor((i / 5) * percentages.length);
-          const endIndex = Math.min(Math.floor(((i + 1) / 5) * percentages.length) - 1, percentages.length - 1);
+          const startIndex = Math.floor((i / 5) * validPercentages.length);
+          const endIndex = Math.min(Math.floor(((i + 1) / 5) * validPercentages.length) - 1, validPercentages.length - 1);
           
-          const minPercent = percentages[endIndex];
-          const maxPercent = percentages[startIndex];
+          const minPercent = validPercentages[Math.max(0, endIndex)];
+          const maxPercent = validPercentages[Math.max(0, startIndex)];
           
-          ranges.push({
-            label: `${i * 20}-${(i + 1) * 20}%`,
-            description: `${minPercent.toFixed(1)}%-${maxPercent.toFixed(1)}%`
-          });
+          // Ensure we have valid numbers before calling toFixed
+          if (typeof minPercent === 'number' && typeof maxPercent === 'number' && !isNaN(minPercent) && !isNaN(maxPercent)) {
+            ranges.push({
+              label: `${i * 20}-${(i + 1) * 20}%`,
+              description: `${minPercent.toFixed(1)}%-${maxPercent.toFixed(1)}%`
+            });
+          } else {
+            ranges.push({
+              label: `${i * 20}-${(i + 1) * 20}%`,
+              description: 'No data'
+            });
+          }
         }
         
         return HOME_ZIPCODE_COLORS.map((color, index) => (
@@ -137,11 +150,25 @@ const LegendContent: React.FC = () => {
         )}
         
         {filters.showNearbyPlaces && (
-          <LegendItem
-            color={[54, 162, 235]} // Blue for nearby places
-            label="Nearby Places"
-            description={`Within ${filters.radius}m radius`}
-          />
+          <>
+            <LegendItem
+              color={[54, 162, 235]} // Blue for nearby places
+              label="Nearby Places"
+              description={`Within ${filters.radius}m radius`}
+            />
+            {(() => {
+              // Calculate filtered places count
+              const nearbyCount = activeLayers
+                .filter(layer => layer.type === 'places')
+                .reduce((count, layer) => count + (layer.data?.length || 0), 0) - 1; // Subtract My Place
+                
+              return nearbyCount > 0 ? (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 3, display: 'block' }}>
+                  {nearbyCount} places shown
+                </Typography>
+              ) : null;
+            })()}
+          </>
         )}
       </Box>
 

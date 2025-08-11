@@ -1,23 +1,59 @@
 import { supabase } from './supabaseClient';
-import { Place, TradeArea, HomeZipcodes } from '../types';
+import { Place, TradeArea, HomeZipcodes, Location } from '../types';
 
 class ApiService {
   async getAllPlaces(): Promise<Place[]> {
     try {
-      const { data, error } = await supabase
-        .from('places')
-        .select('*')
-        .order('name');
+      const allPlaces: any[] = [];
+      const pageSize = 1000;
+      let hasMore = true;
+      let page = 0;
 
-      if (error) throw error;
-      return data || [];
+      while (hasMore) {
+        const start = page * pageSize;
+        const end = start + pageSize - 1;
+
+        const { data, error } = await supabase
+          .from('places')
+          .select('*')
+          .range(start, end)
+          .order('name');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allPlaces.push(...data);
+          
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      return allPlaces.map(place => ({
+        id: place.id,
+        name: place.name,
+        street_address: place.street_address,
+        city: place.city,
+        state: place.state,
+        logo: place.logo,
+        longitude: place.longitude,
+        latitude: place.latitude,
+        sub_category: place.sub_category,
+        isTradeAreaAvailable: place.istradeareaavailable,
+        isHomeZipcodesAvailable: place.ishomezipcodesavailable,
+        ismyplace: place.ismyplace
+      }));
     } catch (error) {
       console.error('Error fetching places:', error);
       return [];
     }
   }
 
-  async getMyPlace(): Promise<Place | null> {
+    async getMyPlace(): Promise<Place | null> {
     try {
       const { data, error } = await supabase
         .from('places')
@@ -29,8 +65,23 @@ class ApiService {
         console.error('Error fetching my place:', error);
         return null;
       }
-      
-      return data;
+
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        name: data.name,
+        street_address: data.street_address,
+        city: data.city,
+        state: data.state,
+        logo: data.logo,
+        longitude: data.longitude,
+        latitude: data.latitude,
+        sub_category: data.sub_category,
+        isTradeAreaAvailable: data.istradeareaavailable,
+        isHomeZipcodesAvailable: data.ishomezipcodesavailable,
+        ismyplace: data.ismyplace
+      };
     } catch (error) {
       console.error('Error fetching my place:', error);
       return null;
@@ -50,24 +101,18 @@ class ApiService {
 
   async getTradeAreaData(placeId: string): Promise<TradeArea[] | null> {
     try {
-      console.log('Fetching trade area data for place:', placeId);
-      
       const { data, error } = await supabase
         .from('trade_areas')
         .select('*')
         .eq('pid', placeId);
 
       if (error) {
-        console.error('Trade area query error:', error);
         return null;
       }
 
       if (!data || data.length === 0) {
-        console.log('No trade area data found for place:', placeId);
         return null;
       }
-
-      console.log(`Found ${data.length} trade area records for place:`, placeId);
       
       // Validate and process data
       const validTradeAreas = data
@@ -110,7 +155,6 @@ class ApiService {
           };
         });
 
-      console.log(`Returning ${validTradeAreas.length} valid trade areas`);
       return validTradeAreas.length > 0 ? validTradeAreas : null;
       
     } catch (error) {
@@ -121,8 +165,6 @@ class ApiService {
 
   async getHomeZipcodesData(placeId: string): Promise<HomeZipcodes | null> {
     try {
-      console.log('Fetching home zipcode data for place:', placeId);
-      
       const { data, error } = await supabase
         .from('home_zipcodes')
         .select('*')
@@ -130,20 +172,14 @@ class ApiService {
         .single();
 
       if (error) {
-        console.error('Home zipcodes query error:', error);
         return null;
       }
 
       if (!data) {
-        console.log('No home zipcode data found for place:', placeId);
         return null;
       }
 
-      console.log('Found home zipcode data for place:', placeId);
-      
-      // Validate locations data
       if (!data.locations) {
-        console.warn('Home zipcode data missing locations:', data);
         return null;
       }
 
@@ -152,14 +188,24 @@ class ApiService {
         try {
           locations = JSON.parse(locations);
         } catch (e) {
-          console.warn('Invalid locations JSON:', data);
           return null;
+        }
+      }
+
+      const locationsArray: Location[] = [];
+      
+      if (locations && typeof locations === 'object') {
+        for (const [zipcodeId, percentage] of Object.entries(locations)) {
+          const numericPercentage = typeof percentage === 'string' ? parseFloat(percentage) : Number(percentage);
+          if (!isNaN(numericPercentage)) {
+            locationsArray.push({ [zipcodeId]: numericPercentage });
+          }
         }
       }
 
       return {
         place_id: data.place_id,
-        locations: locations
+        locations: locationsArray
       };
       
     } catch (error) {
@@ -170,24 +216,18 @@ class ApiService {
 
   async getZipcodesPolygons(zipcodeIds: string[]): Promise<any[]> {
     try {
-      console.log('Fetching zipcode polygons for IDs:', zipcodeIds.slice(0, 5), '...');
-      
       const { data, error } = await supabase
         .from('zipcodes')
         .select('id, polygon')
         .in('id', zipcodeIds);
 
       if (error) {
-        console.error('Zipcodes query error:', error);
         return [];
       }
 
       if (!data || data.length === 0) {
-        console.log('No zipcode polygons found');
         return [];
       }
-
-      console.log(`Found ${data.length} zipcode polygons`);
       
       // Validate and process zipcode polygons
       const validZipcodes = data

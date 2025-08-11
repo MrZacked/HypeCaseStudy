@@ -257,7 +257,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         .filter(Boolean);
 
       if (validZipcodes.length === 0) {
-        console.warn('No valid home zipcode polygons found');
+  
         return;
       }
 

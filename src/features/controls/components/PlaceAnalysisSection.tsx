@@ -14,6 +14,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useMapStore } from '../../../store/useMapStore';
 import { apiService } from '../../../shared/services/apiService';
 import { validateNumericInput } from '../../../shared/utils/security';
+import PlaceSearch from '../../../shared/components/PlaceSearch';
 
 const PlaceAnalysisSection: React.FC = () => {
   const {
@@ -76,6 +77,21 @@ const PlaceAnalysisSection: React.FC = () => {
           <Typography variant="body2" color="text.secondary">
             Shows businesses around "My Place"
           </Typography>
+
+          {/* Quick Place Search */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+              Quick Place Search
+            </Typography>
+            <PlaceSearch 
+              placeholder="Search and jump to any place..."
+              size="small"
+              showCategories={true}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              Search by name, address, or category to quickly navigate to any place
+            </Typography>
+          </Box>
 
           {/* Radius Filter */}
           <TextField

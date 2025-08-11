@@ -47,11 +47,18 @@ export const useHomeZipcodes = () => {
   }, []);
 
   const processHomeZipcodesForDisplay = useCallback((data: HomeZipcodes) => {
-    // Convert location data to percentile groups
-    const locations = data.locations || {};
-    const values = Object.values(locations)
-      .map(val => parseFloat(val))
-      .filter(val => !isNaN(val));
+    // Convert array of Location objects to a flat map
+    const locationsMap: { [zipcodeId: string]: number } = {};
+    
+    if (Array.isArray(data.locations)) {
+      data.locations.forEach(location => {
+        Object.entries(location).forEach(([zipcodeId, percentage]) => {
+          locationsMap[zipcodeId] = percentage;
+        });
+      });
+    }
+    
+    const values = Object.values(locationsMap).filter(val => !isNaN(val));
     
     if (values.length === 0) return [];
 
@@ -71,8 +78,7 @@ export const useHomeZipcodes = () => {
     };
 
     // Group zipcodes by percentile
-    const groups = Object.entries(locations).map(([zipcodeId, valueStr]) => {
-      const value = parseFloat(valueStr);
+    const groups = Object.entries(locationsMap).map(([zipcodeId, value]) => {
       if (isNaN(value)) return null;
       
       let group = 0;
