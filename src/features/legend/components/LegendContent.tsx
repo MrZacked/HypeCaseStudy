@@ -61,36 +61,32 @@ const LegendContent: React.FC = () => {
       const data = homeZipcodeLayer.data;
       // Filter out undefined/null percentages and ensure they're numbers
       const validPercentages = data
-        .map(d => d.percentage)
-        .filter(p => p !== undefined && p !== null && !isNaN(Number(p)))
-        .map(p => Number(p))
-        .sort((a, b) => b - a);
+        .map((d: any) => Number(d.percentage))
+        .filter((p: number) => !isNaN(p))
+        .sort((a: number, b: number) => a - b); // ascending for percentile math
       
       if (validPercentages.length > 0) {
-        const ranges: Array<{label: string; description: string}> = [];
+        const getPercentile = (p: number) => {
+          const index = Math.ceil((p / 100) * validPercentages.length) - 1;
+          return validPercentages[Math.max(0, Math.min(index, validPercentages.length - 1))];
+        };
+
+        const thresholds = [
+          getPercentile(20),
+          getPercentile(40),
+          getPercentile(60),
+          getPercentile(80)
+        ];
+
         
-        // Create 5 percentile groups
-        for (let i = 0; i < 5; i++) {
-          const startIndex = Math.floor((i / 5) * validPercentages.length);
-          const endIndex = Math.min(Math.floor(((i + 1) / 5) * validPercentages.length) - 1, validPercentages.length - 1);
-          
-          const minPercent = validPercentages[Math.max(0, endIndex)];
-          const maxPercent = validPercentages[Math.max(0, startIndex)];
-          
-          // Ensure we have valid numbers before calling toFixed
-          if (typeof minPercent === 'number' && typeof maxPercent === 'number' && !isNaN(minPercent) && !isNaN(maxPercent)) {
-            ranges.push({
-              label: `${i * 20}-${(i + 1) * 20}%`,
-              description: `${minPercent.toFixed(1)}%-${maxPercent.toFixed(1)}%`
-            });
-          } else {
-            ranges.push({
-              label: `${i * 20}-${(i + 1) * 20}%`,
-              description: 'No data'
-            });
-          }
-        }
-        
+        const ranges: Array<{label: string; description: string}> = [
+          { label: '0-20%', description: `0%–${thresholds[0].toFixed(1)}%` },
+          { label: '20-40%', description: `${thresholds[0].toFixed(1)}%–${thresholds[1].toFixed(1)}%` },
+          { label: '40-60%', description: `${thresholds[1].toFixed(1)}%–${thresholds[2].toFixed(1)}%` },
+          { label: '60-80%', description: `${thresholds[2].toFixed(1)}%–${thresholds[3].toFixed(1)}%` },
+          { label: '80-100%', description: `${thresholds[3].toFixed(1)}%+` }
+        ];
+
         return HOME_ZIPCODE_COLORS.map((color, index) => (
           <LegendItem
             key={index}
@@ -104,11 +100,11 @@ const LegendContent: React.FC = () => {
     
     // Fallback to static ranges when no data
     const staticRanges = [
-      { label: '0-20%', description: 'High density' },
-      { label: '20-40%', description: 'Medium-high density' },
+      { label: '0-20%', description: 'Lowest density' },
+      { label: '20-40%', description: 'Low density' },
       { label: '40-60%', description: 'Medium density' },
-      { label: '60-80%', description: 'Low-medium density' },
-      { label: '80-100%', description: 'Low density' }
+      { label: '60-80%', description: 'High density' },
+      { label: '80-100%', description: 'Highest density' }
     ];
     
     return HOME_ZIPCODE_COLORS.map((color, index) => (

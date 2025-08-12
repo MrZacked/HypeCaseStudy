@@ -1,9 +1,8 @@
 import { IconLayer, PolygonLayer } from '@deck.gl/layers';
 import type { Place, TradeArea, LayerConfig } from '../../../shared/types';
 
-// Haversine formula for distance calculation
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3; // Earth's radius in meters
+  const R = 6371e3;
   const φ1 = lat1 * Math.PI/180;
   const φ2 = lat2 * Math.PI/180;
   const Δφ = (lat2-lat1) * Math.PI/180;
@@ -17,7 +16,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-// Robust polygon coordinate extraction
+
 function extractPolygonCoordinates(polygon: any): number[][] {
   if (!polygon || typeof polygon !== 'object') {
     return [];
@@ -25,7 +24,7 @@ function extractPolygonCoordinates(polygon: any): number[][] {
 
   let coords = polygon.coordinates;
   
-  // Handle string polygons (parsed JSON)
+
   if (typeof polygon === 'string') {
     try {
       const parsed = JSON.parse(polygon);
@@ -39,27 +38,23 @@ function extractPolygonCoordinates(polygon: any): number[][] {
     return [];
   }
   
-  // Handle MultiPolygon - take the first polygon
+
   if (polygon.type === 'MultiPolygon') {
     if (coords.length > 0 && Array.isArray(coords[0]) && coords[0].length > 0) {
       return coords[0][0] || [];
     }
   }
   
-  // Handle Polygon - take the exterior ring
   if (polygon.type === 'Polygon') {
     if (coords.length > 0 && Array.isArray(coords[0])) {
       return coords[0] || [];
     }
   }
   
-  // Handle direct coordinate arrays
   if (Array.isArray(coords) && coords.length > 0) {
-    // If first element is an array of arrays, take the first one
     if (Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
       return coords[0];
     }
-    // If first element is an array of numbers, use directly
     if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
       return coords;
     }
@@ -67,14 +62,12 @@ function extractPolygonCoordinates(polygon: any): number[][] {
   
   return [];
 }
-
-// Validate and clean polygon coordinates
 function validatePolygonCoordinates(coords: number[][]): number[][] {
   if (!Array.isArray(coords) || coords.length < 3) {
     return [];
   }
   
-  // Filter valid coordinate pairs
+
   const validCoords = coords.filter(coord => 
     Array.isArray(coord) && 
     coord.length >= 2 && 
@@ -90,7 +83,7 @@ function validatePolygonCoordinates(coords: number[][]): number[][] {
     return [];
   }
   
-  // Ensure polygon is closed
+
   const first = validCoords[0];
   const last = validCoords[validCoords.length - 1];
   if (first[0] !== last[0] || first[1] !== last[1]) {
@@ -100,26 +93,25 @@ function validatePolygonCoordinates(coords: number[][]): number[][] {
   return validCoords;
 }
 
-// Color palettes for distinct visualization
 export const TRADE_AREA_COLORS: [number, number, number][] = [
-  [255, 99, 71],   // Tomato
-  [54, 162, 235],  // Blue  
-  [75, 192, 192],  // Teal
-  [255, 206, 84],  // Yellow
-  [153, 102, 255], // Purple
-  [255, 159, 64],  // Orange
-  [199, 199, 199], // Grey
-  [83, 102, 255],  // Indigo
-  [255, 99, 132],  // Pink
-  [54, 235, 162]   // Green
+  [255, 99, 71],
+  [54, 162, 235],
+  [75, 192, 192],
+  [255, 206, 84],
+  [153, 102, 255],
+  [255, 159, 64],
+  [199, 199, 199],
+  [83, 102, 255],
+  [255, 99, 132],
+  [54, 235, 162]
 ];
 
 export const HOME_ZIPCODE_COLORS: [number, number, number][] = [
-  [255, 206, 84],   // High density - Yellow
-  [255, 159, 64],   // Medium-high - Orange  
-  [255, 99, 132],   // Medium - Pink
-  [153, 102, 255],  // Low-medium - Purple
-  [201, 203, 207],  // Low density - Grey
+  [255, 206, 84],
+  [255, 159, 64],
+  [255, 99, 132],
+  [153, 102, 255],
+  [201, 203, 207]
 ];
 
 interface MapLayersConfig {
@@ -137,7 +129,6 @@ interface MapLayersConfig {
 export function createMapLayers(config: MapLayersConfig): any[] {
   const layers: any[] = [];
   
-  // 1. TRADE AREA LAYERS - Render first (under markers)
   if (config.showTradeAreas !== false) {
     const tradeAreaLayers = config.activeLayers.filter(layer => 
       layer.type === 'trade-area' && layer.visible && layer.data
@@ -188,7 +179,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           return;
         }
         
-        // Set opacity based on specification: 30% largest/lowest, 70% smallest/highest
+
         const opacity = levelNum === 30 ? 0.25 : levelNum === 50 ? 0.4 : 0.65;
         
         const baseColor = layer.color || TRADE_AREA_COLORS[layerIndex % TRADE_AREA_COLORS.length];
@@ -217,7 +208,6 @@ export function createMapLayers(config: MapLayersConfig): any[] {
     });
   }
 
-  // 3. HOME ZIPCODE LAYERS - Percentile-based visualization
   if (config.showHomeZipcodes !== false) {
     const homeZipcodeLayers = config.activeLayers.filter(layer => 
       layer.type === 'home-zipcodes' && layer.visible && layer.data
@@ -228,12 +218,30 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         return;
       }
 
-      // Sort by percentage for percentile calculation
-      const sortedData = [...layer.data].sort((a, b) => b.percentage - a.percentage);
       
-      const validZipcodes = sortedData
-        .map((zipcode, index) => {
-          if (!zipcode.polygon) {
+      const percentages = layer.data
+        .map((d: any) => Number(d.percentage))
+        .filter((p: number) => !isNaN(p))
+        .sort((a: number, b: number) => a - b);
+      
+      if (percentages.length === 0) return;
+
+      const getPercentile = (p: number) => {
+        const index = Math.ceil((p / 100) * percentages.length) - 1;
+        return percentages[Math.max(0, Math.min(index, percentages.length - 1))];
+      };
+
+      // Percentile thresholds for groups: 0-20, 20-40, 40-60, 60-80, 80-100
+      const thresholds = {
+        p20: getPercentile(20),
+        p40: getPercentile(40),
+        p60: getPercentile(60),
+        p80: getPercentile(80)
+      };
+      
+      const validZipcodes = [...layer.data]
+        .map((zipcode) => {
+          if (!zipcode.polygon || isNaN(zipcode.percentage)) {
             return null;
           }
           
@@ -241,25 +249,26 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           const validCoords = validatePolygonCoordinates(coords);
           
           if (validCoords.length >= 4) {
-            // Calculate percentile group (5 groups as per specification)
-            const percentileGroup = Math.floor((index / sortedData.length) * 5);
-            const colorIndex = Math.min(percentileGroup, 4);
+           
+            let group = 0;
+            if (zipcode.percentage <= thresholds.p20) group = 0;
+            else if (zipcode.percentage <= thresholds.p40) group = 1;
+            else if (zipcode.percentage <= thresholds.p60) group = 2;
+            else if (zipcode.percentage <= thresholds.p80) group = 3;
+            else group = 4;
             
             return {
               ...zipcode,
               coordinates: validCoords,
-              fillColor: HOME_ZIPCODE_COLORS[colorIndex],
-              percentileGroup: colorIndex
+              fillColor: HOME_ZIPCODE_COLORS[group],
+              percentileGroup: group
             };
           }
           return null;
         })
         .filter(Boolean);
 
-      if (validZipcodes.length === 0) {
-  
-        return;
-      }
+      if (validZipcodes.length === 0) return;
 
       layers.push(
         new PolygonLayer({
@@ -271,29 +280,25 @@ export function createMapLayers(config: MapLayersConfig): any[] {
           wireframe: false,
           lineWidthMinPixels: 1,
           getPolygon: (d: any) => d.coordinates,
-          getFillColor: (d: any) => [...d.fillColor, 128], // Semi-transparent
-          getLineColor: (d: any) => d.fillColor,
-          getLineWidth: 1,
-          coordinateSystem: 0
+          getFillColor: (d: any) => [...d.fillColor, 180],
+          getLineColor: (d: any) => [...d.fillColor, 255],
+          getLineWidth: 1
         })
       );
     });
   }
 
-  // 3. PLACES LAYER - Render last (on top of polygons)
+
   const placesToShow: Place[] = [];
   
-  // Always show My Place
   if (config.myPlace) {
     placesToShow.push(config.myPlace);
   }
-  
-  // Show nearby places only when filter is enabled
   if (config.filters?.showNearbyPlaces && config.myPlace) {
     const nearbyPlaces = config.places.filter(place => {
       if (place.ismyplace) return false;
       
-      // Apply radius filter
+
       if (config.filters.radius) {
         const distance = calculateDistance(
           config.myPlace!.latitude,
@@ -304,7 +309,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
         if (distance > config.filters.radius) return false;
       }
       
-      // Apply category filter
+
       if (config.filters.categories?.length > 0) {
         if (!config.filters.categories.includes(place.sub_category)) return false;
       }
@@ -315,7 +320,7 @@ export function createMapLayers(config: MapLayersConfig): any[] {
     placesToShow.push(...nearbyPlaces);
   }
   
-  // Create places layer with proper icons (renders on top)
+  
   if (placesToShow.length > 0) {
     layers.push(
       new IconLayer({

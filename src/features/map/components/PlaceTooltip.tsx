@@ -160,7 +160,10 @@ const PlaceTooltip: React.FC<PlaceTooltipProps> = ({ place, x, y, onClose }) => 
         const locationsMap: { [zipcodeId: string]: number } = {};
         homeZipcodesData.locations.forEach(location => {
           Object.entries(location).forEach(([zipcodeId, percentage]) => {
-            locationsMap[zipcodeId] = percentage;
+            const numericPercentage = typeof percentage === 'string' ? parseFloat(percentage) : Number(percentage);
+            if (!isNaN(numericPercentage)) {
+              locationsMap[zipcodeId] = numericPercentage;
+            }
           });
         });
         

@@ -86,16 +86,8 @@ const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({ onToggleSearch })
           case '?':
             event.preventDefault();
             // Show help modal (could be implemented later)
-            console.log('Keyboard Shortcuts:');
-            console.log('L - Toggle left sidebar');
-            console.log('R - Toggle right sidebar');
-            console.log('T - Switch to Trade Areas');
-            console.log('H - Switch to Home Zipcodes');
-            console.log('N - Show nearby places');
-            console.log('M - Go to My Place');
-            console.log('Ctrl+K - Search places');
-            console.log('Esc - Clear all layers');
-            console.log('? - Show this help');
+            
+
             break;
         }
       }

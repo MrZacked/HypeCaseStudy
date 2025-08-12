@@ -175,15 +175,13 @@ class ApiService {
         return null;
       }
 
-      if (!data) {
-        return null;
-      }
-
-      if (!data.locations) {
+      if (!data || !data.locations) {
         return null;
       }
 
       let locations = data.locations;
+      
+      // Handle different data formats from import
       if (typeof locations === 'string') {
         try {
           locations = JSON.parse(locations);
@@ -192,9 +190,14 @@ class ApiService {
         }
       }
 
+
       const locationsArray: Location[] = [];
       
-      if (locations && typeof locations === 'object') {
+      if (Array.isArray(locations)) {
+       
+        locationsArray.push(...locations);
+      } else if (locations && typeof locations === 'object') {
+       
         for (const [zipcodeId, percentage] of Object.entries(locations)) {
           const numericPercentage = typeof percentage === 'string' ? parseFloat(percentage) : Number(percentage);
           if (!isNaN(numericPercentage)) {
@@ -266,7 +269,6 @@ class ApiService {
           };
         });
 
-      console.log(`Returning ${validZipcodes.length} valid zipcode polygons`);
       return validZipcodes;
       
     } catch (error) {
